@@ -360,6 +360,8 @@ if ($c != 3) {
     echo "copy with subquery count failed";
     exit;
 }
+unset ($cnt);
+
 $data = $db->get('users');
 if (count($data) != 3) {
     echo "copy with subquery data count failed";
@@ -386,6 +388,28 @@ if ($db->totalCount != 3) {
     echo "error in totalCount";
     exit;
 }
+
+$result = $db->map ('id')->ArrayBuilder()->getOne ('users', 'id,login');
+if (key ($result) != 1 && $result[1] != 'user1') {
+    echo 'map string=string failed';
+    exit;
+}
+$result = $db->map ('id')->ArrayBuilder()->getOne ('users', 'id,login,createdAt');
+if (key ($result) != 1 && !is_array ($result[1])) {
+    echo 'map string=array failed';
+    exit;
+}
+$result = $db->map ('id')->ObjectBuilder()->getOne ('users', 'id,login');
+if (key ($result) != 1 && $result[1] != 'user1') {
+    echo 'map object string=string failed';
+    exit;
+}
+$result = $db->map ('id')->ObjectBuilder()->getOne ('users', 'id,login,createdAt');
+if (key ($result) != 1 && !is_object ($result[1])) {
+    echo 'map string=object failed';
+    exit;
+}
+
 ///
 //TODO: insert test
 $db->delete("users");
@@ -395,7 +419,6 @@ if ($db->count != 0) {
     exit;
 }
 $db->delete("products");
-
 
 //print_r($db->rawQuery("CALL simpleproc(?)",Array("test")));
 

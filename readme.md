@@ -126,7 +126,7 @@ $data = Array ("login" => "admin",
                "createdAt" => $db->now(),
                "updatedAt" => $db->now(),
 );
-$updateColumns = Array ("updateAt");
+$updateColumns = Array ("updatedAt");
 $lastInsertId = "id";
 $db->onDuplicate($updateColumns, $lastInsertId);
 $id = $db->insert ('users', $data);
@@ -150,6 +150,12 @@ if ($db->update ('users', $data))
     echo $db->count . ' records were updated';
 else
     echo 'update failed: ' . $db->getLastError();
+```
+
+`update()` also support limit parameter:
+```php
+$db->update ('users', $data, 10);
+// Gives: UPDATE users SET ... LIMIT 10
 ```
 
 ### Select Query
@@ -189,7 +195,7 @@ echo "{$count} users found";
 ```
 
 select one column value or function result from multiple rows:
-``php
+```php
 $logins = $db->getValue ("users", "login", null);
 // select login from users
 $logins = $db->getValue ("users", "login", 5);
@@ -198,6 +204,40 @@ foreach ($logins as $login)
     echo $login;
 ```
 
+###Pagination
+Use paginate() instead of get() to fetch paginated result
+```php
+$page = 1;
+// set page limit to 2 results per page. 20 by default
+$db->pageLimit = 2;
+$products = $db->arraybuilder()->paginate("products", $page);
+echo "showing $page out of " . $db->totalPages;
+
+```
+
+### Result transformation / map
+Instead of getting an pure array of results its possible to get result in an associative array with a needed key. If only 2 fields to fetch will be set in get(),
+method will return result in array($k => $v) and array ($k => array ($v, $v)) in rest of the cases.
+
+```php
+$user = $db->map ('login')->ObjectBuilder()->getOne ('users', 'login, id');
+Array
+(
+    [user1] => 1
+)
+
+$user = $db->map ('login')->ObjectBuilder()->getOne ('users', 'id,login,createdAt');
+Array
+(
+    [user1] => stdClass Object
+        (
+            [id] => 1
+            [login] => user1
+            [createdAt] => 2015-10-22 22:27:53
+        )
+
+)
+```
 
 ### Defining a return type
 MysqliDb can return result in 3 different formats: Array of Array, Array of Objects and a Json string. To select a return type use ArrayBuilder(), ObjectBuilder() and JsonBuilder() methods. Note that ArrayBuilder() is a default return type
@@ -263,8 +303,8 @@ $resutls = $db->rawQuery ($q, $params);
 print_r ($results); // contains Array of returned rows
 ```
 
-### Where Method
-This method allows you to specify where parameters of the query.
+### Where / Having Methods
+`where()`, `orWhere()`, `having()` and `orHaving()` methods allows you to specify where and having conditions of the query. All conditions supported by where() are supported by having() as well.
 
 WARNING: In order to use column to column comparisons only raw where conditions should be used as column name or functions cant be passed as a bind variable.
 
@@ -275,6 +315,14 @@ $db->where ('login', 'admin');
 $results = $db->get ('users');
 // Gives: SELECT * FROM users WHERE id=1 AND login='admin';
 ```
+
+```php
+$db->where ('id', 1);
+$db->having ('login', 'admin');
+$results = $db->get ('users');
+// Gives: SELECT * FROM users WHERE id=1 HAVING login='admin';
+```
+
 
 Regular == operator with column to column comparison:
 ```php
@@ -319,6 +367,14 @@ $results = $db->get ('users');
 // Gives: SELECT * FROM users WHERE firstName='John' OR firstName='peter'
 ```
 
+```php
+$db->where ('firstName', 'John');
+$db->orWhere ('firstName', 'Peter');
+$results = $db->get ('users');
+// Gives: SELECT * FROM users WHERE firstName='John' OR firstName='peter'
+```
+
+
 NULL comparison:
 ```php
 $db->where ("lastName", NULL, '<=>');
@@ -338,7 +394,7 @@ Or raw condition with variables:
 $db->where ("(id = ? or id = ?)", Array(6,2));
 $db->where ("login","mike")
 $res = $db->get ("users");
-// Gives: SELECT * FROM users WHERE (id = 2 or id = 2) and login='mike';
+// Gives: SELECT * FROM users WHERE (id = 6 or id = 2) and login='mike';
 ```
 
 
@@ -351,23 +407,25 @@ echo "Showing {$count} from {$db->totalCount}";
 ```
 
 ### Query Keywords
-To add LOW PRIORITY | DELAYED | HIGH PRIORITY | IGNORE and the rest of the mysql keywords to INSERT (), REPLACE (), GET (), UPDATE (), DELETE() method:
+To add LOW PRIORITY | DELAYED | HIGH PRIORITY | IGNORE and the rest of the mysql keywords to INSERT (), REPLACE (), GET (), UPDATE (), DELETE() method or FOR UPDATE | LOCK IN SHARE MODE into SELECT ():
 ```php
-$db->setQueryOption('LOW_PRIORITY');
-$db->insert ($table, $param);
+$db->setQueryOption ('LOW_PRIORITY')->insert ($table, $param);
 // GIVES: INSERT LOW_PRIORITY INTO table ...
+```
+```php
+$db->setQueryOption ('FOR UPDATE')->get ('users');
+// GIVES: SELECT * FROM USERS FOR UPDATE;
 ```
 
 Also you can use an array of keywords:
 ```php
-$db->setQueryOption(Array('LOW_PRIORITY', 'IGNORE'));
-$db->insert ($table,$param);
+$db->setQueryOption (Array('LOW_PRIORITY', 'IGNORE'))->insert ($table,$param);
 // GIVES: INSERT LOW_PRIORITY IGNORE INTO table ...
 ```
 
 Same way keywords could be used in SELECT queries as well:
 ```php
-$db->setQueryOption('SQL_NO_CACHE');
+$db->setQueryOption ('SQL_NO_CACHE');
 $db->get("users");
 // GIVES: SELECT SQL_NO_CACHE * FROM USERS;
 ```
